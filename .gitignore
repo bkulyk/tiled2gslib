@@ -1,0 +1,9 @@
+__pycache__
+tiled2gslib.dSYM
+tiled2gslib
+out.c
+expected.c
+banks*.*
+out
+expected
+test_metatiles.py
