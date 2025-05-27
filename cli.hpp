@@ -10,8 +10,9 @@
 struct Options {
   std::string input_file;
   std::string input_type;
-  std::string save_tiles_file;
-  std::string save_metatiles_file;
+  std::string save_tiles_file = "";
+  std::string save_metatiles_file = "";
+  std::string save_scrolltable_file = "";
   std::string tilesize = "8x8";
   std::string palette = "sms";
   std::string priority_layer = "GSLPriorityLayer";
@@ -35,6 +36,7 @@ std::ostream& operator<<(std::ostream& os, const Options& opts) {
       << "  input_type: \"" << opts.input_type << "\",\n"
       << "  save_tiles_file: \"" << opts.save_tiles_file << "\",\n"
       << "  save_metatiles_file: \"" << opts.save_metatiles_file << "\",\n"
+      << "  save_scrolltable_file: \"" << opts.save_scrolltable_file << "\",\n"
       << "  tilesize: \"" << opts.tilesize << "\",\n"
       << "  tileoffset: " << opts.tileoffset << ",\n"
       << "  palette: \"" << opts.palette << "\",\n"
@@ -55,6 +57,7 @@ Options parse_options(int argc, char** argv) {
 
   app.add_option("--save-tiles", opts.save_tiles_file, "Optional output file path for tiles");
   app.add_option("--save-metatiles", opts.save_metatiles_file, "Optional output file path for metatiles");
+  app.add_option("--save-scrolltable", opts.save_scrolltable_file, "Optional output file path for scrolltable");
   app.add_option("--tilesize", opts.tilesize, "Tile size: 8x8 (default) or 8x16")->check(CLI::IsMember({"8x8", "8x16"}));
   app.add_option("--tileoffset", opts.tileoffset, "Tile offset (default: 0)");
   app.add_option("--palette", opts.palette, "Palette: sms (default) or gg")->check(CLI::IsMember({"sms", "gg"}));
