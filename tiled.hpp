@@ -51,32 +51,13 @@ uint16_t getTileData(int x, int y, tson::Layer* tileLayer, tson::Layer* priority
   }
   int palette = 0; // Assuming default palette 0 for now.
 
-  // --- 4. Assemble the Attribute Byte (8-bit) ---
-  // This will be the lower 8 bits of the combined word
-  uint8_t attribute_byte = 0;
-  attribute_byte |= (vFlip << 0);           // Bit 0: Vertical Flip
-  attribute_byte |= (hFlip << 1);           // Bit 1: Horizontal Flip
-  attribute_byte |= (palette << 2);         // Bits 2-3: Palette (assuming 2 bits, 0-3)
-  attribute_byte |= (priority_flag << 4);   // Bit 4: Priority (0 or 1)
-  attribute_byte |= (current_meta_id << 5); // Bits 5-7: Meta ID (assuming 3 bits, 0-7)
-
-  // --- 5. Combine Tile ID (8-bit) and Attribute Byte (8-bit) into a single 16-bit word ---
-  // uint16_t combined_word = (attribute_byte << 8) | base_tile_id_0based;
-  uint16_t combined_word = (attribute_byte << 8) | base_tile_id_0based;
-
-  if (x == 44 && y == 4) {
-    // --- Debug Prints (Crucial for verifying this new logic) ---
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> Raw GID 32bit: 0x" << std::hex << raw_gid_32bit << std::dec << std::endl;
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> Base Tile ID (0-based): " << std::dec << base_tile_id_0based << std::dec << std::endl;
-    // std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> Base Tile ID (0-based): 0x" << std::hex << base_tile_id_0based << std::dec << std::endl;
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> Meta ID: " << current_meta_id << std::endl;
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> Priority: " << priority_flag << std::endl;
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> HFlip: " << hFlip << ", VFlip: " << vFlip << std::endl;
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> Assembled Attr Byte: 0x" << std::hex << static_cast<int>(attribute_byte) << std::dec << std::endl;
-    std::cout << "C++ DEBUG getTileData(" << x << "," << y << ") -> FINAL COMBINED Word: 0x" << std::hex << combined_word << std::dec << std::endl;
-    std::cout << std::endl;
-    // --- Debug: Check for tile index overflow ---
-  }
+  uint16_t combined_word = 0;
+  combined_word = combined_word | (hFlip) ? 512 : 0;
+  combined_word |= vFlip ? 1024 : 0;
+  combined_word |= base_tile_id_0based;
+  combined_word |= palette;
+  combined_word |= priority_flag != 0 ? 4096 : 0;
+  combined_word |= (current_meta_id & 7) << 13;
 
   return combined_word;
 }
