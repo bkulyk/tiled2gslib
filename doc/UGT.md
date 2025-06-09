@@ -1,3 +1,5 @@
+Note: this is the doc from UGT, keeping it here for reference.
+
 # UGT Documentation
 
 The UGT app is provided with the GSL library to create metatile and scrolltable data for the library.

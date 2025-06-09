@@ -1,7 +1,23 @@
 #include <vector>
-#include "lib/stb_image.h" // Place at the top of your file
-#include "lib/stb_image_write.h" // Place at the top of your file
+#include <fstream>
+#include <filesystem>
+#include "lib/stb_image.h"
 #include "lib/tileson.hpp"
+#include "doc.hpp"
+
+namespace fs = std::filesystem;
+
+typedef std::array<uint16_t, 4> Metatile; // Each metatile consists of 4 words (2x2 tiles)
+typedef std::vector<Metatile> Metatiles;
+typedef std::vector<uint8_t> Scrolltable;
+
+struct GsltInfo {
+  Metatiles metatiles;
+  Scrolltable scrolltable;
+  std::string tilesetImagePath;
+  int width;
+  int height;
+};
 
 // --- getTileData Function (Revised to return a single combined word) ---
 // Extracts and encodes data for a single 8x8 tile into a single 16-bit combined word.
@@ -49,6 +65,7 @@ uint16_t getTileData(int x, int y, tson::Layer* tileLayer, tson::Layer* priority
       std::cerr << "Warning: Meta tile at (" << x << "," << y << ") has GID but no associated tileset for meta ID calculation." << std::endl;
     }
   }
+  
   int palette = 0; // Assuming default palette 0 for now.
 
   uint16_t combined_word = 0;
@@ -62,7 +79,7 @@ uint16_t getTileData(int x, int y, tson::Layer* tileLayer, tson::Layer* priority
   return combined_word;
 }
 
-void saveMetatileFile(std::vector<std::array<uint16_t, 4>> metatiles, std::string filename) {
+void saveMetatileFile(Metatiles metatiles, std::string filename) {
   // Calculate total file length (8 bytes header + metatiles.size() * 4 words/metatile * 2 bytes/word).
   // If your map is 4x4, extractMetaTiles will produce 4 metatiles.
   // So, metatiles.size() will be 4.
@@ -95,10 +112,10 @@ void saveMetatileFile(std::vector<std::array<uint16_t, 4>> metatiles, std::strin
   ofs.close();
 }
 
-void saveScrolltable(const std::vector<uint8_t>& scrolltable, const std::string& filename, tson::Vector2i size) {
+void saveScrolltable(Scrolltable& scrolltable, const std::string& filename, uint16_t width, uint16_t height) {
   uint16_t tile_size = 8;
-  uint16_t width_in_metatiles = size.x / 2;
-  uint16_t height_in_metatiles = size.y / 2;
+  uint16_t width_in_metatiles = width / 2;
+  uint16_t height_in_metatiles = width / 2;
   uint16_t data_bytes = width_in_metatiles * height_in_metatiles;
   uint16_t total_bytes = data_bytes;
   uint16_t width_pixels = width_in_metatiles * tile_size * 2;
@@ -139,13 +156,13 @@ void saveScrolltable(const std::vector<uint8_t>& scrolltable, const std::string&
 // --- extractMetaTiles Function ---
 // Extracts 2x2 metatiles from the map.
 // This function remains generic and processes all metatiles in the map.
-void extractMetaTiles(Options *opts, std::unique_ptr<tson::Map> *map) {
+GsltInfo extractMetaTiles(Options *opts, std::unique_ptr<tson::Map> *map) {
   tson::Map* m = map->get();
   tson::Layer* tileLayer = m->getLayer(opts->tile_layer);
   tson::Layer* priorityLayer = m->getLayer(opts->priority_layer);
   tson::Layer* metaLayer = m->getLayer(opts->meta_layer);
   tson::Vector2i size = m->getSize(); // Map size in tiles (e.g., 4x4)
-  std::vector<std::array<uint16_t, 4>> all_metatiles; // Change to 4 words per metatile
+  Metatiles all_metatiles; // Change to 4 words per metatile
 
   std::cout << "size: " << size.x << " x " << size.y << std::endl;
 
@@ -176,11 +193,10 @@ void extractMetaTiles(Options *opts, std::unique_ptr<tson::Map> *map) {
   }
 
   std::vector<std::array<uint16_t, 4>> unique_metatiles;
-  std::vector<uint8_t> scrolltable;
+  Scrolltable scrolltable;
 
   // Build the scrolltable from the unique metatiles
   scrolltable.reserve(all_metatiles.size()); // Reserve space for scrolltable
-  std::cout << "build scrolltable" << std::endl;
   for (const auto& metatile : all_metatiles) {
     // Try to find the metatile in the unique_metatiles vector
     auto it = std::find(unique_metatiles.begin(), unique_metatiles.end(), metatile);
@@ -199,22 +215,22 @@ void extractMetaTiles(Options *opts, std::unique_ptr<tson::Map> *map) {
 
   std::cout << "metatile count: " << unique_metatiles.size() << std::endl;
 
-  // save only the unique tiles
-  if (!opts->save_metatiles_file.empty()) {
-    saveMetatileFile(unique_metatiles, opts->save_metatiles_file);
-  }
+  GsltInfo info = {unique_metatiles, scrolltable, m->getTilesets()[0].getImagePath(), size.x, size.y};
+  return info;
+}
 
-  if (!opts->save_scrolltable_file.empty()) {
-    saveScrolltable(scrolltable, opts->save_scrolltable_file, size);
-  }
-
-  return;
+// use the path from opts->input_file and append the tile_path
+std::string getAbsoluteTilePath(Options *opts, std::string tile_path) {
+  std::string input_dir = fs::path(opts->input_file).parent_path().string();
+  
+  // join the input directory with the tile path
+  return (fs::path(input_dir) / tile_path).string();
 }
 
 // --- processTiledDoc Function ---
 // Main function to process the Tiled map and extract/save metatiles and scrolltable.
 int processTiledDoc(Options *opts) {
-  std::cout << "[processTiledDoc] Processing... " << opts->input_file << std::endl;
+  std::cout << "Processing... " << opts->input_file << std::endl;
 
   // Parse the Tiled file using Tileson
   tson::Tileson t;
@@ -224,7 +240,26 @@ int processTiledDoc(Options *opts) {
     return 1;
   }
 
-  extractMetaTiles(opts, &map);
+  GsltInfo info = extractMetaTiles(opts, &map);
+  std::cout << std::endl;
+
+  if (!opts->save_metatiles_file.empty()) {
+    saveMetatileFile(info.metatiles, opts->save_metatiles_file);
+    std::cout << "Saved metatiles to: " << opts->save_metatiles_file << std::endl;
+  }
+
+  if (!opts->save_scrolltable_file.empty()) {
+    saveScrolltable(info.scrolltable, opts->save_scrolltable_file, info.width, info.height);
+    std::cout << "Saved scrolltable to: " << opts->save_scrolltable_file << std::endl;
+  }
+
+  if (!opts->save_metatiles_doc_file.empty()) {
+    std::string path = getAbsoluteTilePath(opts, info.tilesetImagePath);
+    saveMetatileDocHtml(info.metatiles, path, opts->save_metatiles_doc_file);
+    std::cout << "Saved metatile html doc to: " << opts->save_metatiles_doc_file << std::endl;
+  }
+  
+  std::cout << "fin. " << std::endl;
 
   return 0;
 }

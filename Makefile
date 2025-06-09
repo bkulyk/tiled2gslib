@@ -1,4 +1,4 @@
-CXX = g++
+CXX = zig c++
 CXXFLAGS = -std=c++17 -Wall -g -I./lib
 LDFLAGS =
 

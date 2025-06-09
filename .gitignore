@@ -1,3 +1,5 @@
+.DS_Store
+.vscode/settings.json
 __pycache__
 .pytest_cache
 tiled2gslib.dSYM
@@ -8,3 +10,7 @@ banks*.*
 out
 expected
 test_metatiles.py
+nametable.hpp
+index.html
+build_test.sh
+tmp
